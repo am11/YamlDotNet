@@ -53,7 +53,14 @@ namespace YamlDotNet.Serialization.EventEmitters
                     eventInfo.RenderedValue = YamlFormatter.FormatBoolean(eventInfo.Source.Value);
                     break;
 
+                case TypeCode.Byte:
+                case TypeCode.Int16:
                 case TypeCode.Int32:
+                case TypeCode.Int64:
+                case TypeCode.SByte:
+                case TypeCode.UInt16:
+                case TypeCode.UInt32:
+                case TypeCode.UInt64:
                     var valueIsEnum = eventInfo.Source.Value.GetType().IsEnum();
                     if (valueIsEnum)
                     {
@@ -65,14 +72,6 @@ namespace YamlDotNet.Serialization.EventEmitters
                         eventInfo.RenderedValue = YamlFormatter.FormatNumber(eventInfo.Source.Value);
                     }
                     break;
-
-                case TypeCode.Byte:
-                case TypeCode.Int16:
-                case TypeCode.Int64:
-                case TypeCode.SByte:
-                case TypeCode.UInt16:
-                case TypeCode.UInt32:
-                case TypeCode.UInt64:
                 case TypeCode.Single:
                 case TypeCode.Double:
                 case TypeCode.Decimal:

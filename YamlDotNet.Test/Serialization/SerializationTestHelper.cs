@@ -141,6 +141,15 @@ namespace YamlDotNet.Test.Serialization
         Two
     }
 
+    public enum SByteEnum : sbyte { Sbyte1, Sbyte2 }
+    public enum ByteEnum : uint { Byte1, Byte2 }
+    public enum Int16Enum : short { Short1, Short2 }
+    public enum UInt16Enum : ushort { Ushort1, UShort2 }
+    public enum Int32Enum : int { Int1, Int2 }
+    public enum UInt32Enum : uint { Uint1, Uint2 }
+    public enum Int64Enum : long { Long1, Long2 }
+    public enum UInt64Enum : ulong { Ulong1, Ulong2 }
+
     public class CircularReference
     {
         public CircularReference Child1 { get; set; }
