@@ -462,6 +462,10 @@ namespace YamlDotNet.Core
                 {
                     Skip();
                 }
+                else if (GetCurrentToken() is AnchorAlias)
+                {
+                    throw new SemanticErrorException(currentToken.Start, currentToken.End, "While parsing a node, did not find expected token.");
+                }
                 else
                 {
                     break;
@@ -707,6 +711,20 @@ namespace YamlDotNet.Core
                     state = ParserState.BlockMappingValue;
                     return ProcessEmptyScalar(mark);
                 }
+            }
+
+            else if (GetCurrentToken() is Value)
+            {
+                Mark mark = GetCurrentToken().End;
+                Skip();
+                return ProcessEmptyScalar(mark);
+            }
+
+            else if (GetCurrentToken() is AnchorAlias alias)
+            {
+                ParsingEvent evt = new Events.AnchorAlias(alias.Value, alias.Start, alias.End);
+                Skip();
+                return evt;
             }
 
             else if (GetCurrentToken() is BlockEnd)
