@@ -755,7 +755,7 @@ namespace YamlDotNet.Core
         /// </summary>
         private ParsingEvent ParseBlockMappingValue()
         {
-            if (GetCurrentToken() is Value)
+            if (GetCurrentToken() is Value)// || (GetCurrentToken() is Key && GetCurrentToken().Start.Index + 1 == GetCurrentToken().End.Index))
             {
                 Mark mark = GetCurrentToken().End;
                 Skip();
@@ -938,6 +938,11 @@ namespace YamlDotNet.Core
                         state = ParserState.FlowMappingValue;
                         return ProcessEmptyScalar(GetCurrentToken().Start);
                     }
+                }
+                else if (GetCurrentToken() is Scalar)
+                {
+                    states.Push(ParserState.FlowMappingValue);
+                    return ParseNode(false, false);
                 }
                 else if (!(GetCurrentToken() is FlowMappingEnd))
                 {

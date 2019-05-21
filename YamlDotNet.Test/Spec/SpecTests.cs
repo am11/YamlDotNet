@@ -42,9 +42,8 @@ namespace YamlDotNet.Test.Spec
         // Note: all of these (23) tests are failing the assertion on line 65
         private static readonly List<string> ignoredSuites = new List<string>
         {
-            "DK3J", "W4TN", "NJ66", "4MUZ", "NHX8", "WZ62", "M7A3", "6LVF", "S4JQ", "A2M4",
-            "2LFX", "K3WX", "8MK2", "Q5MG", "2JQS", "S3PD", "R4YG", "9SA2", "UT92", "FP8R",
-            "52DL", "5MUD", "6BCT"
+            "52DL", "W4TN", "6BCT", "R4YG", "NHX8", "WZ62", "M7A3", "6LVF", "S4JQ", "A2M4",
+            "2LFX", "S3PD", "8MK2", "Q5MG", "2JQS"
         };
 
         private static readonly List<string> knownFalsePositives = new List<string>
@@ -188,7 +187,7 @@ namespace YamlDotNet.Test.Spec
             {
                 var testName = Path.GetFileName(testPath);
                 // comment the following line to run spec tests (requires 'Rebuild')
-                if (ignoredSuites.Contains(testName)) continue;
+                //if (ignoredSuites.Contains(testName)) continue;
 
                 var inputFile = Path.Combine(testPath, InputFilename);
                 if (!File.Exists(inputFile)) continue;

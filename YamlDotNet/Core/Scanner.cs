@@ -380,6 +380,8 @@ namespace YamlDotNet.Core
             // Is it the key indicator?
 
             if (analyzer.Check('?') && (flowLevel > 0 || analyzer.IsWhiteBreakOrZero(1)))
+           // ||
+           // (simpleKeyAllowed && analyzer.Check(':') && cursor.LineOffset == 0 && analyzer.IsWhiteBreakOrZero(1)))
             {
                 FetchKey();
                 return;
@@ -1062,6 +1064,11 @@ namespace YamlDotNet.Core
                     // Add the BLOCK-MAPPING-START token if needed.
 
                     RollIndent(cursor.LineOffset, -1, false, cursor.Mark());
+
+                    if (simpleKeyAllowed && cursor.LineOffset == 0 && indent == cursor.LineOffset)
+                    {
+                        tokens.Insert(tokens.Count, new Key(cursor.Mark(), cursor.Mark()));
+                    }
                 }
 
                 // Simple keys after ':' are allowed in the block context.
@@ -1571,7 +1578,7 @@ namespace YamlDotNet.Core
 
             // Determine the indentation level if needed.
 
-            if (currentIndent == 0)
+            if (currentIndent == 0 && (cursor.LineOffset > 0 || indent > -1))
             {
                 currentIndent = Math.Max(maxIndent, Math.Max(indent + 1, 1));
             }
