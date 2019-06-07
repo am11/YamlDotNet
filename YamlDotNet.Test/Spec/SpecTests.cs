@@ -27,6 +27,7 @@ using Xunit;
 using Xunit.Sdk;
 using YamlDotNet.Core;
 using YamlDotNet.Core.Events;
+using YamlDotNet.RepresentationModel;
 
 namespace YamlDotNet.Test.Spec
 {
@@ -36,6 +37,7 @@ namespace YamlDotNet.Test.Spec
         private const string InputFilename = "in.yaml";
         private const string ExpectedEventFilename = "test.event";
         private const string ErrorFilename = "error";
+        private const string OutputFilename = "out.yaml";
 
         private static readonly string specFixtureDirectory = GetTestFixtureDirectory();
 
@@ -51,7 +53,7 @@ namespace YamlDotNet.Test.Spec
         };
 
         [Theory, MemberData(nameof(GetYamlSpecDataSuites))]
-        public void ConformsWithYamlSpec(string name, string description, string inputFile, string expectedEventFile, bool error)
+        public void ConformsWithYamlSpec(string name, string description, string inputFile, string outputFilename, string expectedEventFile, bool error)
         {
             var expectedResult = File.ReadAllText(expectedEventFile);
             using (var writer = new StringWriter())
@@ -90,6 +92,24 @@ namespace YamlDotNet.Test.Spec
                     }
                 }
             }
+
+            if (File.Exists(outputFilename))
+            {
+                var stream = new YamlStream();
+                using (var writer = new StringWriter())
+                {
+                    using (var reader = File.OpenText(inputFile))
+                    {
+                        stream.Load(reader);
+                        stream.Save(new Emitter(writer), false);
+                    }
+                    
+                    string expected = File.ReadAllText(outputFilename);
+
+                    Assert.Equal(expected, writer.ToString());
+                }
+            }
+
         }
 
         private static void ConvertToLibYamlStyleAnnotatedEventStream(TextReader textReader, TextWriter textWriter)
@@ -191,6 +211,7 @@ namespace YamlDotNet.Test.Spec
                 var inputFile = Path.Combine(testPath, InputFilename);
                 if (!File.Exists(inputFile)) continue;
 
+                var outputFile = Path.Combine(testPath, OutputFilename);
                 var descriptionFile = Path.Combine(testPath, DescriptionFilename);
                 var hasErrorFile = File.Exists(Path.Combine(testPath, ErrorFilename));
                 var expectedEventFile = Path.Combine(testPath, ExpectedEventFilename);
@@ -200,6 +221,7 @@ namespace YamlDotNet.Test.Spec
                     testName,
                     File.ReadAllText(descriptionFile).TrimEnd(),
                     inputFile,
+                    outputFile,
                     expectedEventFile,
                     hasErrorFile
                 };
