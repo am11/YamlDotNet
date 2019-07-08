@@ -206,10 +206,6 @@ namespace YamlDotNet.Core
                 }
                 else
                 {
-                    // Check if any potential simple key may occupy the head position.
-
-                    StaleSimpleKeys();
-
                     foreach (var simpleKey in simpleKeys)
                     {
                         if (simpleKey.IsPossible && simpleKey.TokenNumber == tokensParsed)
@@ -483,6 +479,10 @@ namespace YamlDotNet.Core
 
             if (isPlainScalar)
             {
+                if (simpleKeyAllowed && previous is DocumentStart documentStart && documentStart.Start.Line == cursor.Line)
+                {
+                    throw new SyntaxErrorException("While scanning a document start, found mapping key starting after '---' indicator.");
+                }
                 FetchPlainScalar();
                 return;
             }
@@ -1440,6 +1440,13 @@ namespace YamlDotNet.Core
                 }
             }
 
+            // Check if there is a comment without whitespace after block scalar indicator (yaml-test-suite: X4QW).
+
+            if (analyzer.Check('#'))
+            {
+                throw new SyntaxErrorException(start, cursor.Mark(), "While scanning a block scalar, found a comment without whtespace after '>' indicator.");
+            }
+
             // Eat whitespaces and comments to the end of the line.
 
             while (analyzer.IsWhite())
@@ -1948,6 +1955,11 @@ namespace YamlDotNet.Core
                             value.Append(whitespaces);
                             whitespaces.Length = 0;
                         }
+                    }
+
+                    if (flowLevel > 0 && cursor.LineOffset < currentIndent)
+                    {
+                        throw new Exception();
                     }
 
                     // Copy the character.
