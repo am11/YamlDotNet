@@ -479,10 +479,6 @@ namespace YamlDotNet.Core
 
             if (isPlainScalar)
             {
-                if (simpleKeyAllowed && previous is DocumentStart documentStart && documentStart.Start.Line == cursor.Line)
-                {
-                    throw new SyntaxErrorException("While scanning a document start, found mapping key starting after '---' indicator.");
-                }
                 FetchPlainScalar();
                 return;
             }
@@ -802,14 +798,18 @@ namespace YamlDotNet.Core
             }
             else
             {
-                while (!analyzer.EndOfInput && !analyzer.IsBreak() && !analyzer.Check('#'))
+                //if (previous is DocumentEnd documentEnd && documentEnd.End.Line == cursor.Line)
                 {
-                    if (!analyzer.IsWhite())
+                    while (!analyzer.EndOfInput && !analyzer.IsBreak() && !analyzer.Check('#'))
                     {
-                        throw new SyntaxErrorException(start, cursor.Mark(), "While scanning a document end, found invalid content after '...' marker.");
+                        if (!analyzer.IsWhite())
+                        {
+                            throw new SyntaxErrorException(start, cursor.Mark(), "While scanning a document end, found invalid content after '...' marker.");
+                        }
+                        Skip();
                     }
-                    Skip();
                 }
+
                 tokens.Enqueue(new DocumentEnd(start, start));
             }
         }
@@ -1179,9 +1179,20 @@ namespace YamlDotNet.Core
 
         private Token ScanAnchor(bool isAlias)
         {
-            // Eat the indicator character.
-
             var start = cursor.Mark();
+
+            if (previous is DocumentStart documentStart && documentStart.Start.Line == cursor.Line)
+            {
+                //for (int offset = 0; !analyzer.IsBreakOrZero(offset) && !analyzer.Check('#', offset); ++offset)
+                //{
+                //    if (analyzer.Check(':', offset))
+                //    {
+                //        throw new SyntaxErrorException(start, start, "While scanning a document start, found mapping key starting after '---' indicator.");
+                //    }
+                //}
+            }
+
+            // Eat the indicator character.
 
             Skip();
 
@@ -1890,6 +1901,10 @@ namespace YamlDotNet.Core
 
             var key = simpleKeys.Peek();
 
+            // Check if this is the same line as DocumentStart or DocumentEnd marker.
+
+            bool onDocumentStartLine = previous is DocumentStart documentStart && documentStart.Start.Line == cursor.Line;
+
             // Consume the content of the plain scalar.
 
             while (true)
@@ -1913,6 +1928,11 @@ namespace YamlDotNet.Core
                 // Consume non-blank characters.
                 while (!analyzer.IsWhiteBreakOrZero())
                 {
+                    if (onDocumentStartLine && analyzer.Check(':'))
+                    {
+                        throw new SyntaxErrorException(start, start, "While scanning a document start, found mapping key starting after '---' indicator.");
+                    }
+
                     // Check for indicators that may end a plain scalar.
 
                     if (analyzer.Check(':') && !isAliasValue && (analyzer.IsWhiteBreakOrZero(1) || (flowLevel > 0 && analyzer.Check(',', 1))) || (flowLevel > 0 && analyzer.Check(",?[]{}")))

@@ -529,7 +529,33 @@ namespace YamlDotNet.Core
                     state = states.Pop();
                     ParsingEvent evt = new Events.Scalar(anchorName, tagName, scalar.Value, scalar.Style, isPlainImplicit, isQuotedImplicit, start, scalar.End);
 
+                    var foo = scanner.Current;
                     Skip();
+
+                    // scanner.MoveNextWithoutConsuming();
+
+                    if (scanner.MoveNextWithoutConsuming())
+                    {
+                        var commentToken = scanner.Current as Comment;
+                        if (commentToken != null)
+                        {
+                            pendingEvents.Enqueue(new Events.Comment(commentToken.Value, commentToken.IsInline, commentToken.Start, commentToken.End));
+                            scanner.ConsumeCurrent();
+                            currentToken = null;
+                        //    break;
+                        }
+                        else
+                        {
+                            currentToken = scanner.Current;
+                      //      break;
+                        }
+                    }
+
+
+                    //if (anchor != null && currentEvent is Events.DocumentStart s && !s.IsImplicit && s.Start.Line == anchor.Start.Line)
+                    {
+                        // throw new Exception();
+                    }
                     return evt;
                 }
 
