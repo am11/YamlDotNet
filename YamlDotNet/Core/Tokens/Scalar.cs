@@ -45,6 +45,7 @@ namespace YamlDotNet.Core.Tokens
         }
 
         private readonly ScalarStyle style;
+        private readonly bool isMultiline;
 
         /// <summary>
         /// Gets the style.
@@ -57,6 +58,15 @@ namespace YamlDotNet.Core.Tokens
                 return style;
             }
         }
+
+        public bool IsMultiline
+        {
+            get
+            {
+                return isMultiline;
+            }
+        }
+
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Scalar"/> class.
@@ -89,6 +99,14 @@ namespace YamlDotNet.Core.Tokens
         {
             this.value = value;
             this.style = style;
+        }
+
+        public Scalar(string value, ScalarStyle style, Mark start, Mark end, bool isMultiline)
+            : base(start, end)
+        {
+            this.value = value;
+            this.style = style;
+            this.isMultiline = isMultiline;
         }
     }
 }

@@ -65,7 +65,7 @@ namespace YamlDotNet.Test.Spec
                 catch (Exception ex)
                 {
                     Assert.True(error, $"Unexpected spec failure ({name}).\n{description}\nExpected:\n{expectedResult}\nActual:\n[Writer Output]\n{writer}\n[Exception]\n{ex}");
-                   // Assert.Equal(expectedResult, writer.ToString(), ignoreLineEndingDifferences: true);
+                    Assert.Equal(expectedResult, writer.ToString(), ignoreLineEndingDifferences: true);
 
                     Debug.Assert(!(error && knownFalsePositives.Contains(name)), $"Spec test '{name}' passed but present in '{nameof(knownFalsePositives)}' list. Consider removing it from the list.");
                     return;

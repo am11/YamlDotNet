@@ -235,66 +235,17 @@ namespace YamlDotNet.Core
         /// </summary>
         private ParsingEvent ParseDocumentStart(bool isImplicit)
         {
-            // Parse extra document end indicators.
+            // Skip document end tokens.
 
-            if (!isImplicit)
+            while (GetCurrentToken() is DocumentEnd)
             {
-                while (GetCurrentToken() is DocumentEnd)
-                {
-                    Skip();
-                }
-            }
-
-            if (GetCurrentToken() is Scalar && (state == ParserState.ImplicitDocumentStart || state == ParserState.DocumentStart))
-            {
-                isImplicit = true;
-            }
-
-            // Parse an isImplicit document.
-
-            if (isImplicit && !(GetCurrentToken() is VersionDirective || GetCurrentToken() is TagDirective || GetCurrentToken() is DocumentStart || GetCurrentToken() is StreamEnd || GetCurrentToken() is DocumentEnd) || GetCurrentToken() is BlockMappingStart)
-            {
-                var directives = new TagDirectiveCollection();
-                ProcessDirectives(directives);
-
-                states.Push(ParserState.DocumentEnd);
-
-                state = ParserState.BlockNode;
-
-                return new Events.DocumentStart(null, directives, true, GetCurrentToken().Start, GetCurrentToken().End);
-            }
-
-            // Parse an explicit document.
-
-            else if (!(GetCurrentToken() is StreamEnd || GetCurrentToken() is DocumentEnd))
-            {
-                Mark start = GetCurrentToken().Start;
-                var directives = new TagDirectiveCollection();
-                var versionDirective = ProcessDirectives(directives);
-
-                var current = GetCurrentToken();
-                if (!(current is DocumentStart))
-                {
-                    throw new SemanticErrorException(current.Start, current.End, "Did not find expected <document start>.");
-                }
-
-                states.Push(ParserState.DocumentEnd);
-
-                state = ParserState.DocumentContent;
-
-                ParsingEvent evt = new Events.DocumentStart(versionDirective, directives, false, start, current.End);
                 Skip();
-                return evt;
             }
 
             // Parse the stream end.
 
-            else
+            if (GetCurrentToken() is StreamEnd)
             {
-                if (GetCurrentToken() is DocumentEnd)
-                {
-                    Skip();
-                }
                 state = ParserState.StreamEnd;
 
                 ParsingEvent evt = new Events.StreamEnd(GetCurrentToken().Start, GetCurrentToken().End);
@@ -304,6 +255,54 @@ namespace YamlDotNet.Core
                     throw new InvalidOperationException("The scanner should contain no more tokens.");
                 }
                 return evt;
+            }
+
+            if (!isImplicit)
+            {
+                if (GetCurrentToken() is Scalar || GetCurrentToken() is BlockMappingStart)
+                {
+                    isImplicit = true;
+                }
+            }
+            else if (GetCurrentToken() is TagDirective || GetCurrentToken() is VersionDirective ||
+                     GetCurrentToken() is DocumentStart)
+            {
+                isImplicit = false;
+            }
+
+            // Parse an implicit document.
+
+            if (isImplicit)
+            {
+                AddTagDirectives(tagDirectives, Constants.DefaultTagDirectives);
+
+                states.Push(ParserState.DocumentEnd);
+
+                state = ParserState.BlockNode;
+
+                return new Events.DocumentStart(null, tagDirectives, true, GetCurrentToken().Start, GetCurrentToken().End);
+            }
+
+            // Parse an explicit document.
+
+            else
+            {
+                Mark start = GetCurrentToken().Start;
+                var directives = new TagDirectiveCollection();
+                var versionDirective = ProcessDirectives(directives);
+
+                var current = GetCurrentToken();
+                if (!(current is DocumentStart))
+                {
+                    throw new SemanticErrorException(start, current.End, "While parsing a node, did not find expected <document start>.");
+                }
+
+                states.Push(ParserState.DocumentEnd);
+
+                state = ParserState.DocumentContent;
+
+                Skip();
+                return new Events.DocumentStart(versionDirective, directives, false, start, current.End);
             }
         }
 
@@ -527,36 +526,35 @@ namespace YamlDotNet.Core
                     }
 
                     state = states.Pop();
-                    ParsingEvent evt = new Events.Scalar(anchorName, tagName, scalar.Value, scalar.Style, isPlainImplicit, isQuotedImplicit, start, scalar.End);
 
-                    var foo = scanner.Current;
                     Skip();
 
-                    // scanner.MoveNextWithoutConsuming();
+                    ParsingEvent evt = new Events.Scalar(anchorName, tagName, scalar.Value, scalar.Style, isPlainImplicit, isQuotedImplicit, start, scalar.End);
 
-                    if (scanner.MoveNextWithoutConsuming())
+                    if (anchor != null && currentEvent is Events.DocumentStart s && !s.IsImplicit && s.Start.Line == anchor.Start.Line)
                     {
-                        var commentToken = scanner.Current as Comment;
-                        if (commentToken != null)
+                        while (scanner.MoveNextWithoutConsuming())
                         {
-                            pendingEvents.Enqueue(new Events.Comment(commentToken.Value, commentToken.IsInline, commentToken.Start, commentToken.End));
-                            scanner.ConsumeCurrent();
-                            currentToken = null;
-                        //    break;
-                        }
-                        else
-                        {
-                            currentToken = scanner.Current;
-                      //      break;
+                            var commentToken = scanner.Current as Comment;
+                            if (commentToken != null)
+                            {
+                                pendingEvents.Enqueue(evt);
+                                scanner.MoveNext();
+                                return new Events.Comment(commentToken.Value, commentToken.IsInline, commentToken.Start, commentToken.End);
+                            }
+                            else
+                            {
+                                currentToken = scanner.Current;
+                                break;
+                            }
                         }
                     }
+                    //else if (currentEvent is Events.DocumentStart s2 && s2.IsImplicit && scalar.IsMultiline)
+                    //{
+                    //   // throw new Exception();
+                    //}
 
-
-                    //if (anchor != null && currentEvent is Events.DocumentStart s && !s.IsImplicit && s.Start.Line == anchor.Start.Line)
-                    {
-                        // throw new Exception();
-                    }
-                    return evt;
+                        return evt;
                 }
 
                 var flowSequenceStart = GetCurrentToken() as FlowSequenceStart;

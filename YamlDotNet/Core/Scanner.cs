@@ -140,14 +140,15 @@ namespace YamlDotNet.Core
 
         public bool MoveNextWithoutConsuming()
         {
-            if (!tokenAvailable && !streamEndProduced)
+            if (!streamEndProduced)
             {
-                FetchMoreTokens();
+                //FetchMoreTokens();
+                FetchNextToken();
             }
             if (tokens.Count > 0)
             {
                 Current = tokens.Dequeue();
-                tokenAvailable = false;
+                //tokenAvailable = false;
                 return true;
             }
             else
@@ -192,11 +193,11 @@ namespace YamlDotNet.Core
         {
             // While we need more tokens to fetch, do it.
 
-            while (true)
+        //    while (true)
             {
                 // Check if we really need to fetch more tokens.
 
-                bool needsMoreTokens = false;
+                bool needsMoreTokens = true;
 
                 if (tokens.Count == 0)
                 {
@@ -216,17 +217,20 @@ namespace YamlDotNet.Core
                     }
                 }
 
-                // We are finished.
+                //// We are finished.
                 if (!needsMoreTokens)
                 {
-                    break;
+                    //tokenAvailable = true;
+                    return;
+                    //      break;
                 }
 
                 // Fetch the next token.
 
+                //if (needsMoreTokens)
                 FetchNextToken();
             }
-            tokenAvailable = true;
+           // tokenAvailable = true;
         }
 
         private static bool StartsWith(StringBuilder what, char start)
@@ -1179,20 +1183,9 @@ namespace YamlDotNet.Core
 
         private Token ScanAnchor(bool isAlias)
         {
-            var start = cursor.Mark();
-
-            if (previous is DocumentStart documentStart && documentStart.Start.Line == cursor.Line)
-            {
-                //for (int offset = 0; !analyzer.IsBreakOrZero(offset) && !analyzer.Check('#', offset); ++offset)
-                //{
-                //    if (analyzer.Check(':', offset))
-                //    {
-                //        throw new SyntaxErrorException(start, start, "While scanning a document start, found mapping key starting after '---' indicator.");
-                //    }
-                //}
-            }
-
             // Eat the indicator character.
+
+            var start = cursor.Mark();
 
             Skip();
 
@@ -1892,6 +1885,7 @@ namespace YamlDotNet.Core
             var whitespaces = new StringBuilder();
             var leadingBreak = new StringBuilder();
             var trailingBreaks = new StringBuilder();
+            var isMultiline = false;
 
             bool hasLeadingBlanks = false;
             int currentIndent = indent + 1;
@@ -1901,7 +1895,7 @@ namespace YamlDotNet.Core
 
             var key = simpleKeys.Peek();
 
-            // Check if this is the same line as DocumentStart or DocumentEnd marker.
+            // Check if this is the same line as DocumentStart.
 
             bool onDocumentStartLine = previous is DocumentStart documentStart && documentStart.Start.Line == cursor.Line;
 
@@ -1924,6 +1918,16 @@ namespace YamlDotNet.Core
                 }
 
                 var isAliasValue = analyzer.Check('*') && !(key.IsPossible && key.IsRequired);
+
+                //if (previous is StreamStart && hasLeadingBlanks && key.IsPossible)
+                //{
+                //    key.IsPossible = false;
+                //    break;
+                //}
+                if(hasLeadingBlanks)
+                {
+                    isMultiline = true;
+                }
 
                 // Consume non-blank characters.
                 while (!analyzer.IsWhiteBreakOrZero())
@@ -2054,7 +2058,7 @@ namespace YamlDotNet.Core
 
             // Create a token.
 
-            return new Scalar(value.ToString(), ScalarStyle.Plain, start, end);
+            return new Scalar(value.ToString(), ScalarStyle.Plain, start, end, isMultiline);
         }
 
 
