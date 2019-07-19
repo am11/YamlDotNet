@@ -38,6 +38,7 @@ namespace YamlDotNet.Core
         private readonly Stack<ParserState> states = new Stack<ParserState>();
         private readonly TagDirectiveCollection tagDirectives = new TagDirectiveCollection();
         private ParserState state;
+        private VersionDirective version;
 
         private readonly IScanner scanner;
         private ParsingEvent currentEvent;
@@ -52,8 +53,7 @@ namespace YamlDotNet.Core
                 {
                     currentToken = scanner.Current;
 
-                    var commentToken = currentToken as Comment;
-                    if (commentToken != null)
+                    if (currentToken is Comment commentToken)
                     {
                         pendingEvents.Enqueue(new Events.Comment(commentToken.Value, commentToken.IsInline, commentToken.Start, commentToken.End));
                         scanner.ConsumeCurrent();
@@ -312,8 +312,8 @@ namespace YamlDotNet.Core
         /// </summary>
         private VersionDirective ProcessDirectives(TagDirectiveCollection tags)
         {
-            VersionDirective version = null;
             bool hasOwnDirectives = false;
+            VersionDirective localVersion = null;
 
             while (true)
             {
@@ -332,7 +332,7 @@ namespace YamlDotNet.Core
                         throw new SemanticErrorException(currentVersion.Start, currentVersion.End, "Found incompatible YAML document.");
                     }
 
-                    version = currentVersion;
+                    localVersion = version = currentVersion;
                     hasOwnDirectives = true;
                 }
                 else if ((tag = GetCurrentToken() as TagDirective) != null)
@@ -343,6 +343,13 @@ namespace YamlDotNet.Core
                     }
                     tags.Add(tag);
                     hasOwnDirectives = true;
+                }
+
+                // Starting from v1.2, it is not permitted to use tag shorthands for multiple documents in a stream.
+                else if (GetCurrentToken() is DocumentStart && (version == null || (version.Version.Major == 1 && version.Version.Minor > 1)))
+                {
+                    hasOwnDirectives = true;
+                    break;
                 }
                 else
                 {
@@ -361,7 +368,7 @@ namespace YamlDotNet.Core
 
             AddTagDirectives(tagDirectives, tags);
 
-            return version;
+            return localVersion;
         }
 
         private static void AddTagDirectives(TagDirectiveCollection directives, IEnumerable<TagDirective> source)
@@ -437,6 +444,11 @@ namespace YamlDotNet.Core
         /// </summary>
         private ParsingEvent ParseNode(bool isBlock, bool isIndentlessSequence)
         {
+            if (GetCurrentToken() is Error errorToken)
+            {
+                throw new SemanticErrorException(errorToken.Start, errorToken.End, errorToken.Value);
+            }
+
             var alias = GetCurrentToken() as AnchorAlias;
             if (alias != null)
             {
@@ -465,6 +477,10 @@ namespace YamlDotNet.Core
                 else if (GetCurrentToken() is AnchorAlias anchorAlias)
                 {
                     throw new SemanticErrorException(anchorAlias.Start, anchorAlias.End, "While parsing a node, did not find expected token.");
+                }
+                else if ((errorToken = GetCurrentToken() as Error) != null)
+                {
+                    throw new SemanticErrorException(errorToken.Start, errorToken.End, errorToken.Value);
                 }
                 else
                 {
@@ -527,9 +543,21 @@ namespace YamlDotNet.Core
                     }
 
                     state = states.Pop();
+                    Skip();
+
                     ParsingEvent evt = new Events.Scalar(anchorName, tagName, scalar.Value, scalar.Style, isPlainImplicit, isQuotedImplicit, start, scalar.End);
 
-                    Skip();
+                    // Read next token to ensure the error case spect test 'CXX2':
+                    // "Mapping with anchor on document start line".
+                    if (anchor != null && scanner.MoveNextWithoutConsuming())
+                    {
+                        currentToken = scanner.Current;
+                        if ((errorToken = currentToken as Error) != null)
+                        {
+                            throw new SemanticErrorException(errorToken.Start, errorToken.End, errorToken.Value);
+                        }
+                    }
+
                     return evt;
                 }
 
@@ -593,6 +621,7 @@ namespace YamlDotNet.Core
             {
                 end = GetCurrentToken().End;
                 Skip();
+                version = null;
                 isImplicit = false;
             }
             else if (!(currentToken is StreamEnd || currentToken is DocumentStart))
@@ -731,6 +760,11 @@ namespace YamlDotNet.Core
                 ParsingEvent evt = new Events.MappingEnd(GetCurrentToken().Start, GetCurrentToken().End);
                 Skip();
                 return evt;
+            }
+
+            else if (GetCurrentToken() is Error error)
+            {
+                throw new SyntaxErrorException(error.Start, error.End, error.Value);
             }
 
             else

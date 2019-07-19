@@ -51,7 +51,6 @@ namespace YamlDotNet.Core
             { 'e', '\x1B' },
             { ' ', '\x20' },
             { '"', '"' },
-            { '\'', '\'' },
             { '\\', '\\' },
             { '/', '/' },
             { 'N', '\x85' },
@@ -207,8 +206,6 @@ namespace YamlDotNet.Core
                 else
                 {
                     // Check if any potential simple key may occupy the head position.
-
-                    StaleSimpleKeys();
 
                     foreach (var simpleKey in simpleKeys)
                     {
@@ -483,8 +480,17 @@ namespace YamlDotNet.Core
 
             if (isPlainScalar)
             {
+                if (simpleKeyAllowed && previous is DocumentStart documentStart && documentStart.Start.Line == cursor.Line)
+                {
+                    throw new SyntaxErrorException("While scanning a document start, found mapping key starting after '---' indicator.");
+                }
                 FetchPlainScalar();
                 return;
+            }
+
+            if (simpleKeyAllowed && indent >= cursor.LineOffset && analyzer.IsTab())
+            {
+                throw new SyntaxErrorException("While scanning a mapping, found invalid tab as indendation.");
             }
 
             if (analyzer.IsWhiteBreakOrZero())
@@ -802,15 +808,21 @@ namespace YamlDotNet.Core
             }
             else
             {
+                Token errorToken = null;
                 while (!analyzer.EndOfInput && !analyzer.IsBreak() && !analyzer.Check('#'))
                 {
                     if (!analyzer.IsWhite())
                     {
-                        throw new SyntaxErrorException(start, cursor.Mark(), "While scanning a document end, found invalid content after '...' marker.");
+                        errorToken = new Error("While scanning a document end, found invalid content after '...' marker.", start, cursor.Mark());
+                        break;
                     }
                     Skip();
                 }
                 tokens.Enqueue(new DocumentEnd(start, start));
+                if (errorToken != null)
+                {
+                    tokens.Enqueue(errorToken);
+                }
             }
         }
 
@@ -890,9 +902,14 @@ namespace YamlDotNet.Core
             var start = cursor.Mark();
             Skip();
 
-            Token token;
+            Token token, errorToken = null;
             if (isSequenceToken)
             {
+                if (analyzer.Check('#'))
+                {
+                    errorToken = new Error("While scanning a flow sequence end, found invalid comment after ']'.", start, start);
+                }
+
                 token = new FlowSequenceEnd(start, start);
             }
             else
@@ -901,6 +918,10 @@ namespace YamlDotNet.Core
             }
 
             tokens.Enqueue(token);
+            if (errorToken != null)
+            {
+                tokens.Enqueue(errorToken);
+            }
         }
 
         /// <summary>
@@ -937,9 +958,16 @@ namespace YamlDotNet.Core
             var start = cursor.Mark();
             Skip();
 
+            var end = cursor.Mark();
+            if (analyzer.Check('#'))
+            {
+                tokens.Enqueue(new Error("While scanning a flow entry, found invalid comment after comma.", start, end));
+                return;
+            }
+
             // Create the FLOW-ENTRY token and append it to the queue.
 
-            tokens.Enqueue(new FlowEntry(start, cursor.Mark()));
+            tokens.Enqueue(new FlowEntry(start, end));
         }
 
         /// <summary>
@@ -1076,7 +1104,8 @@ namespace YamlDotNet.Core
                     if (!simpleKeyAllowed)
                     {
                         var mark = cursor.Mark();
-                        throw new SyntaxErrorException(mark, mark, "Mapping values are not allowed in this context.");
+                        tokens.Enqueue(new Error("Mapping values are not allowed in this context.", mark, mark));
+                        return;
                     }
 
                     // Add the BLOCK-MAPPING-START token if needed.
@@ -1440,6 +1469,13 @@ namespace YamlDotNet.Core
                 }
             }
 
+            // Check if there is a comment without whitespace after block scalar indicator (yaml-test-suite: X4QW).
+
+            if (analyzer.Check('#'))
+            {
+                throw new SyntaxErrorException(start, cursor.Mark(), "While scanning a block scalar, found a comment without whtespace after '>' indicator.");
+            }
+
             // Eat whitespaces and comments to the end of the line.
 
             while (analyzer.IsWhite())
@@ -1618,6 +1654,14 @@ namespace YamlDotNet.Core
             // Create the SCALAR token and append it to the queue.
 
             tokens.Enqueue(ScanFlowScalar(isSingleQuoted));
+
+            // Check if there is a comment subsequently after double-quoted scalar without space.
+
+            if (!isSingleQuoted && analyzer.Check('#'))
+            {
+                var start = cursor.Mark();
+                tokens.Enqueue(new Error("While scanning a flow sequence end, found invalid comment after double-quoted scalar.", start, start));
+            }
         }
 
         /// <summary>
@@ -1638,6 +1682,8 @@ namespace YamlDotNet.Core
             var whitespaces = new StringBuilder();
             var leadingBreak = new StringBuilder();
             var trailingBreaks = new StringBuilder();
+            bool hasLeadingBlanks = false;
+
             while (true)
             {
                 // Check that there are no document indicators at the beginning of the line.
@@ -1654,9 +1700,14 @@ namespace YamlDotNet.Core
                     throw new SyntaxErrorException(start, cursor.Mark(), "While scanning a quoted scalar, found unexpected end of stream.");
                 }
 
-                // Consume non-blank characters.
+                if (hasLeadingBlanks && !isSingleQuoted && indent >= cursor.LineOffset)
+                {
+                    throw new SyntaxErrorException(start, cursor.Mark(), "While scanning a multi-line double-quoted scalar, found wrong indentation.");
+                }
 
-                bool hasLeadingBlanks = false;
+                hasLeadingBlanks = false;
+
+                // Consume non-blank characters.
 
                 while (!analyzer.IsWhiteBreakOrZero())
                 {
@@ -1860,15 +1911,22 @@ namespace YamlDotNet.Core
             simpleKeyAllowed = false;
 
             // Create the SCALAR token and append it to the queue.
+            bool isMultiline = false;
+            var scalar = ScanPlainScalar(ref isMultiline);
 
-            tokens.Enqueue(ScanPlainScalar());
+            if (isMultiline && analyzer.Check(':') && flowLevel == 0 && indent < cursor.LineOffset)
+            {
+                tokens.Enqueue(new Error("", cursor.Mark(), cursor.Mark()));
+                //  throw new Exception();
+            }
+            tokens.Enqueue(scalar);
         }
 
         /// <summary>
         /// Scan a plain scalar.
         /// </summary>
 
-        private Token ScanPlainScalar()
+        private Scalar ScanPlainScalar(ref bool isMultiline)
         {
             var value = new StringBuilder();
             var whitespaces = new StringBuilder();
@@ -1882,6 +1940,10 @@ namespace YamlDotNet.Core
             var end = start;
 
             var key = simpleKeys.Peek();
+
+            // Check if this is the same line as DocumentStart or DocumentEnd marker.
+
+            bool onDocumentStartLine = previous is DocumentStart documentStart && documentStart.Start.Line == cursor.Line;
 
             // Consume the content of the plain scalar.
 
@@ -1906,10 +1968,19 @@ namespace YamlDotNet.Core
                 // Consume non-blank characters.
                 while (!analyzer.IsWhiteBreakOrZero())
                 {
+                    if (onDocumentStartLine && analyzer.Check(':'))
+                    {
+                        throw new SyntaxErrorException(start, start, "While scanning a document start, found mapping key starting after '---' indicator.");
+                    }
+
                     // Check for indicators that may end a plain scalar.
 
                     if (analyzer.Check(':') && !isAliasValue && (analyzer.IsWhiteBreakOrZero(1) || (flowLevel > 0 && analyzer.Check(',', 1))) || (flowLevel > 0 && analyzer.Check(",?[]{}")))
                     {
+                        if (flowLevel == 0 && !key.IsPossible)
+                        {
+                            tokens.Enqueue(new Error("lol", cursor.Mark(), cursor.Mark()));
+                        }
                         break;
                     }
 
@@ -1949,7 +2020,10 @@ namespace YamlDotNet.Core
                             whitespaces.Length = 0;
                         }
                     }
-
+                    if (flowLevel > 0 && cursor.LineOffset < currentIndent)
+                    {
+                        throw new Exception();
+                    }
                     // Copy the character.
 
                     value.Append(ReadCurrentCharacter());
@@ -1990,6 +2064,8 @@ namespace YamlDotNet.Core
                     }
                     else
                     {
+                        isMultiline = true;
+
                         // Check if it is a first line break.
 
                         if (!hasLeadingBlanks)
