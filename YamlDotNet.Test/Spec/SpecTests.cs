@@ -51,7 +51,7 @@ namespace YamlDotNet.Test.Spec
 
         private static readonly List<string> knownParserDesyncInErrorCases = new List<string>
         {
-            "4H7K", "4JVG", "BS4K", "C2SP", "EB22", "H7J7", "P2EQ", "RHX7", "T833", "W9L4"
+            "4H7K", "4JVG", "BS4K", "C2SP", "EB22", "H7J7", "P2EQ", "RHX7", "T833", ""
         };
 
         [Theory, MemberData(nameof(GetYamlSpecDataSuites))]

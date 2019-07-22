@@ -1412,6 +1412,7 @@ namespace YamlDotNet.Core
             int increment = 0;
             int currentIndent = 0;
             bool leadingBlank = false;
+            bool? isFirstLine = null;
 
             // Eat the indicator '|' or '>'.
 
@@ -1497,6 +1498,14 @@ namespace YamlDotNet.Core
             if (analyzer.IsBreak())
             {
                 SkipLine();
+                if (!isFirstLine.HasValue)
+                {
+                    isFirstLine = true;
+                }
+                else if (isFirstLine == true)
+                {
+                    isFirstLine = false;
+                }
             }
 
             var end = cursor.Mark();
@@ -1509,8 +1518,9 @@ namespace YamlDotNet.Core
             }
 
             // Scan the leading line breaks and determine the indentation level if needed.
-
-            currentIndent = ScanBlockScalarBreaks(currentIndent, trailingBreaks, start, ref end);
+            var breaksBefore = trailingBreaks.Length;
+            currentIndent = ScanBlockScalarBreaks(currentIndent, trailingBreaks, start, ref end, ref isFirstLine);
+            isFirstLine = false;
 
             // Scan the block scalar content.
 
@@ -1566,7 +1576,7 @@ namespace YamlDotNet.Core
 
                 // Eat the following indentation spaces and line breaks.
 
-                currentIndent = ScanBlockScalarBreaks(currentIndent, trailingBreaks, start, ref end);
+                currentIndent = ScanBlockScalarBreaks(currentIndent, trailingBreaks, start, ref end, ref isFirstLine);
             }
 
             // Chomp the tail.
@@ -1591,9 +1601,10 @@ namespace YamlDotNet.Core
         /// indentation level if needed.
         /// </summary>
 
-        private int ScanBlockScalarBreaks(int currentIndent, StringBuilder breaks, Mark start, ref Mark end)
+        private int ScanBlockScalarBreaks(int currentIndent, StringBuilder breaks, Mark start, ref Mark end, ref bool? isFirstLine)
         {
             int maxIndent = 0;
+            int indentOfFirstLine = -1;
 
             end = cursor.Mark();
 
@@ -1617,7 +1628,20 @@ namespace YamlDotNet.Core
 
                 if (!analyzer.IsBreak())
                 {
+                    int indent = cursor.LineOffset;
+                    for (var i = 0; !analyzer.IsBreak(i) && analyzer.IsSpace(i); ++i, ++indent) ;
+                    if (isFirstLine == true && indent > cursor.LineOffset)
+                    {
+                        isFirstLine = false;
+                        indentOfFirstLine = indent;
+                    }
                     break;
+                }
+
+                if (isFirstLine == true)
+                {
+                    isFirstLine = false;
+                    indentOfFirstLine = cursor.LineOffset;
                 }
 
                 // Consume the line break.
@@ -1625,6 +1649,13 @@ namespace YamlDotNet.Core
                 breaks.Append(ReadLine());
 
                 end = cursor.Mark();
+            }
+
+            // if first-line and current indent > 1 and analyzer IsBreak
+
+            if (indentOfFirstLine > 1 && currentIndent < indentOfFirstLine)
+            {
+                throw new Exception("tada");
             }
 
             // Determine the indentation level if needed.
