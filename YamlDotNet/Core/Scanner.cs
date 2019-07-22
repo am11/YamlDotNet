@@ -73,6 +73,7 @@ namespace YamlDotNet.Core
         private int tokensParsed;
         private bool tokenAvailable;
         private Token previous;
+        private Anchor previousAnchor;
 
         private bool IsDocumentStart() =>
             !analyzer.EndOfInput &&
@@ -261,7 +262,7 @@ namespace YamlDotNet.Core
                     if (key.IsRequired)
                     {
                         var mark = cursor.Mark();
-                        throw new SyntaxErrorException(mark, mark, "While scanning a simple key, could not find expected ':'.");
+                        tokens.Enqueue(new Error("While scanning a simple key, could not find expected ':'.", mark, mark));
                     }
 
                     key.IsPossible = false;
@@ -736,7 +737,14 @@ namespace YamlDotNet.Core
             switch (name)
             {
                 case "YAML":
-                    directive = ScanVersionDirectiveValue(start);
+                    if (previous is StreamStart || previous is DocumentEnd)
+                    {
+                        directive = ScanVersionDirectiveValue(start);
+                    }
+                    else
+                    {
+                        throw new SemanticErrorException(start, cursor.Mark(), "While scanning a version directive, did not find preceding <document end>.");
+                    }
                     break;
 
                 case "TAG":
@@ -984,8 +992,15 @@ namespace YamlDotNet.Core
 
                 if (!simpleKeyAllowed)
                 {
+                    if (previousAnchor != null)
+                    {
+                        if (previousAnchor.End.Line == cursor.Line)
+                        {
+                            throw new SemanticErrorException(previousAnchor.Start, previousAnchor.End, "Anchor before sequence entry on same line is not allowed.");
+                        }
+                    }
                     var mark = cursor.Mark();
-                    throw new SyntaxErrorException(mark, mark, "Block sequence entries are not allowed in this context.");
+                    tokens.Enqueue(new Error("Block sequence entries are not allowed in this context.", mark, mark));
                 }
 
                 // Add the BLOCK-SEQUENCE-START token if needed.
@@ -1266,7 +1281,7 @@ namespace YamlDotNet.Core
             }
             else
             {
-                return new Anchor(value.ToString(), start, cursor.Mark());
+                return previousAnchor = new Anchor(value.ToString(), start, cursor.Mark());
             }
         }
 
@@ -1518,8 +1533,7 @@ namespace YamlDotNet.Core
             }
 
             // Scan the leading line breaks and determine the indentation level if needed.
-            var breaksBefore = trailingBreaks.Length;
-            currentIndent = ScanBlockScalarBreaks(currentIndent, trailingBreaks, start, ref end, ref isFirstLine);
+            currentIndent = ScanBlockScalarBreaks(currentIndent, trailingBreaks, isLiteral, ref end, ref isFirstLine);
             isFirstLine = false;
 
             // Scan the block scalar content.
@@ -1576,7 +1590,7 @@ namespace YamlDotNet.Core
 
                 // Eat the following indentation spaces and line breaks.
 
-                currentIndent = ScanBlockScalarBreaks(currentIndent, trailingBreaks, start, ref end, ref isFirstLine);
+                currentIndent = ScanBlockScalarBreaks(currentIndent, trailingBreaks, isLiteral, ref end, ref isFirstLine);
             }
 
             // Chomp the tail.
@@ -1601,7 +1615,7 @@ namespace YamlDotNet.Core
         /// indentation level if needed.
         /// </summary>
 
-        private int ScanBlockScalarBreaks(int currentIndent, StringBuilder breaks, Mark start, ref Mark end, ref bool? isFirstLine)
+        private int ScanBlockScalarBreaks(int currentIndent, StringBuilder breaks, bool isLiteral, ref Mark end, ref bool? isFirstLine)
         {
             int maxIndent = 0;
             int indentOfFirstLine = -1;
@@ -1628,12 +1642,16 @@ namespace YamlDotNet.Core
 
                 if (!analyzer.IsBreak())
                 {
-                    int indent = cursor.LineOffset;
-                    for (var i = 0; !analyzer.IsBreak(i) && analyzer.IsSpace(i); ++i, ++indent) ;
-                    if (isFirstLine == true && indent > cursor.LineOffset)
+                    if (isLiteral && isFirstLine == true)
                     {
-                        isFirstLine = false;
-                        indentOfFirstLine = indent;
+                        int localIndent = cursor.LineOffset;
+                        int i = 0;
+                        for (; !analyzer.IsBreak(i) && analyzer.IsSpace(i); ++i, ++localIndent) ;
+                        if (analyzer.IsBreak(i) && localIndent > cursor.LineOffset)
+                        {
+                            isFirstLine = false;
+                            indentOfFirstLine = localIndent;
+                        }
                     }
                     break;
                 }
@@ -1651,11 +1669,18 @@ namespace YamlDotNet.Core
                 end = cursor.Mark();
             }
 
-            // if first-line and current indent > 1 and analyzer IsBreak
+            // Check if first line after literal is all spaces and count of spaces is more than "1 + currentIndent".
 
-            if (indentOfFirstLine > 1 && currentIndent < indentOfFirstLine)
+            if (isLiteral && indentOfFirstLine > 1 && currentIndent < indentOfFirstLine - 1)
             {
                 throw new Exception("tada");
+            }
+
+            // Check if first line after literal is all spaces and count of spaces is more than "currentIndent".
+
+            if (isLiteral && currentIndent <= indentOfFirstLine)
+            {
+                //       throw new Exception("tada");
             }
 
             // Determine the indentation level if needed.

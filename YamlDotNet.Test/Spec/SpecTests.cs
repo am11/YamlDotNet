@@ -51,7 +51,7 @@ namespace YamlDotNet.Test.Spec
 
         private static readonly List<string> knownParserDesyncInErrorCases = new List<string>
         {
-            "4H7K", "4JVG", "BS4K", "C2SP", "EB22", "H7J7", "P2EQ", "RHX7", "T833", ""
+            "4H7K", "4JVG", "BS4K", "C2SP", "EB22", "", "", "", "", ""
         };
 
         [Theory, MemberData(nameof(GetYamlSpecDataSuites))]
@@ -153,16 +153,19 @@ namespace YamlDotNet.Test.Spec
                             default: textWriter.Write(" :"); break;
                         }
 
-                        foreach (char character in scalar.Value)
+                        if (!string.IsNullOrEmpty(scalar.Value))
                         {
-                            switch (character)
+                            foreach (char character in scalar.Value)
                             {
-                                case '\b': textWriter.Write("\\b"); break;
-                                case '\t': textWriter.Write("\\t"); break;
-                                case '\n': textWriter.Write("\\n"); break;
-                                case '\r': textWriter.Write("\\r"); break;
-                                case '\\': textWriter.Write("\\\\"); break;
-                                default: textWriter.Write(character); break;
+                                switch (character)
+                                {
+                                    case '\b': textWriter.Write("\\b"); break;
+                                    case '\t': textWriter.Write("\\t"); break;
+                                    case '\n': textWriter.Write("\\n"); break;
+                                    case '\r': textWriter.Write("\\r"); break;
+                                    case '\\': textWriter.Write("\\\\"); break;
+                                    default: textWriter.Write(character); break;
+                                }
                             }
                         }
                         break;

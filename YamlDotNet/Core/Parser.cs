@@ -348,6 +348,11 @@ namespace YamlDotNet.Core
                 // Starting from v1.2, it is not permitted to use tag shorthands for multiple documents in a stream.
                 else if (GetCurrentToken() is DocumentStart && (version == null || (version.Version.Major == 1 && version.Version.Minor > 1)))
                 {
+                    if (GetCurrentToken() is DocumentStart && (version == null))
+                    {
+                        version = new VersionDirective(new Version(1, 2));
+                    }
+
                     hasOwnDirectives = true;
                     break;
                 }
@@ -547,14 +552,27 @@ namespace YamlDotNet.Core
 
                     ParsingEvent evt = new Events.Scalar(anchorName, tagName, scalar.Value, scalar.Style, isPlainImplicit, isQuotedImplicit, start, scalar.End);
 
-                    // Read next token to ensure the error case spect test 'CXX2':
+                    // Read next token to ensure the error case spec test 'CXX2':
                     // "Mapping with anchor on document start line".
+
                     if (anchor != null && scanner.MoveNextWithoutConsuming())
                     {
                         currentToken = scanner.Current;
                         if ((errorToken = currentToken as Error) != null)
                         {
                             throw new SemanticErrorException(errorToken.Start, errorToken.End, errorToken.Value);
+                        }
+                    }
+
+                    // Read next token to ensure the error case spec test 'T833':
+                    // "Flow mapping missing a separating comma".
+
+                    if (state == ParserState.FlowMappingKey && scanner.MoveNextWithoutConsuming())
+                    {
+                        currentToken = scanner.Current;
+                        if (!(currentToken is FlowEntry) && !(currentToken is FlowMappingEnd))
+                        {
+                            throw new SemanticErrorException(currentToken.Start, currentToken.End, "While parsing a flow mapping, did not find expected ',' or '}'.");
                         }
                     }
 
@@ -621,7 +639,6 @@ namespace YamlDotNet.Core
             {
                 end = GetCurrentToken().End;
                 Skip();
-                version = null;
                 isImplicit = false;
             }
             else if (!(currentToken is StreamEnd || currentToken is DocumentStart))
@@ -629,6 +646,10 @@ namespace YamlDotNet.Core
                 throw new SemanticErrorException(start, end, "Did not find expected <document end>.");
             }
 
+            if (version != null && version.Version.Major == 1 && version.Version.Minor > 1)
+            {
+                version = null;
+            }
             state = ParserState.DocumentStart;
             return new Events.DocumentEnd(isImplicit, start, end);
         }
