@@ -138,7 +138,13 @@ Task("Test")
     .IsDependentOn("Build")
     .Does(() =>
     {
-        DotNetCoreTest();
+        var testSettings = new DotNetCoreTestSettings {
+            Configuration = configuration,
+            ArgumentCustomization = (args) => args.AppendQuoted($"--logger:trx;LogFileName={logFilePath}")
+                .Append("--logger:\"console;verbosity=normal;noprogress=true\"")
+        };
+
+        DotNetCoreTest(testSettings);
     });
 
 Task("PerformanceTest")
