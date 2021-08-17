@@ -31,6 +31,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <None Include="Helpers/Portability/**/*.cs" />
     <Compile Remove="Helpers/Portability/**/*.cs" />
     <Compile Include="Helpers/Portability/*$(RealTargetFramework)*/*.cs" />

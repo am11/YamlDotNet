@@ -64,7 +64,7 @@ namespace YamlDotNet.Core
             }
             return currentToken;
         }
-
+private TextWriter writer;
         /// <summary>
         /// Initializes a new instance of the <see cref="Parser"/> class.
         /// </summary>
@@ -73,12 +73,17 @@ namespace YamlDotNet.Core
             : this(new Scanner(input))
         {
         }
-
+        public Parser(TextReader input, TextWriter writer)
+            : this(new Scanner(input))
+        {
+            this.writer = writer;
+        }
         /// <summary>
         /// Initializes a new instance of the <see cref="Parser"/> class.
         /// </summary>
         public Parser(IScanner scanner)
         {
+            this.writer = null;
             this.scanner = scanner;
         }
 
@@ -95,6 +100,7 @@ namespace YamlDotNet.Core
         /// <returns>Returns true if there are more events available, otherwise returns false.</returns>
         public bool MoveNext()
         {
+            scanner.writer = writer;
             // No events after the end of the stream or error.
             if (state == ParserState.StreamEnd)
             {
@@ -460,6 +466,7 @@ namespace YamlDotNet.Core
             }
 
             var current = GetCurrentToken() ?? throw new SemanticErrorException("Reached the end of the stream while parsing a node");
+            if (writer != null)  writer.WriteLine("foxy {0}", current.Start);
             if (current is AnchorAlias alias)
             {
                 state = states.Pop();
@@ -563,9 +570,10 @@ namespace YamlDotNet.Core
 
                     // Read next token to ensure the error case spec test 'CXX2':
                     // "Mapping with anchor on document start line".
-
+if (writer != null) writer.WriteLine("freakin {0} -- {1}", scalar.Value, start);
                     if (!anchorName.IsEmpty && scanner.MoveNextWithoutConsuming())
                     {
+if (writer != null) writer.WriteLine("<<1");
                         currentToken = scanner.Current;
                         if (currentToken is Error)
                         {
@@ -579,6 +587,8 @@ namespace YamlDotNet.Core
 
                     if (state == ParserState.FlowMappingKey && scanner.MoveNextWithoutConsuming())
                     {
+                        if (writer != null) writer.WriteLine("<<2");
+
                         currentToken = scanner.Current;
                         if (currentToken != null && !(currentToken is FlowEntry) && !(currentToken is FlowMappingEnd))
                         {
@@ -622,10 +632,12 @@ namespace YamlDotNet.Core
                     return new Events.Scalar(anchorName, tagName, string.Empty, ScalarStyle.Plain, isImplicit, false, start, current.End);
                 }
 
-                throw new SemanticErrorException(current.Start, current.End, "While parsing a node, did not find expected node content.");
+
+
+                throw new SemanticErrorException(current.Start, current.End, "While parsing a node, did not find expected node content." + current + " " +  state);
             }
         }
-
+public bool START = false;
         /// <summary>
         /// Parse the productions:
         /// implicit_document    ::= block_node DOCUMENT-END*
@@ -1007,6 +1019,7 @@ namespace YamlDotNet.Core
                     current = GetCurrentToken();
                     if (!(current is Value || current is FlowEntry || current is FlowMappingEnd))
                     {
+                     if(writer != null)     writer.WriteLine(1 + " >> " + current);
                         states.Push(ParserState.FlowMappingValue);
                         return ParseNode(false, false);
                     }

@@ -25,6 +25,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using YamlDotNet.Core.Tokens;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using System.Reflection;
+using System.Linq;
 
 namespace YamlDotNet.Core
 {
@@ -393,15 +397,44 @@ namespace YamlDotNet.Core
                 return;
             }
 
-            // Is it the value indicator?
+var simpleKey = simpleKeys.Peek();
+var nonePossible = true;
 
-            if (analyzer.Check(':') && (flowLevel > 0 || analyzer.IsWhiteBreakOrZero(1)) &&
-                !(simpleKeyAllowed && flowLevel > 0))
-            {
+                    foreach (var simpleKey2 in simpleKeys)
+                    {
+                        if (simpleKey.IsPossible)
+                        {
+                            nonePossible = false;
+                            break;
+                        }
+                    }
+
+  //          if(analyzer.Peek(0) == ':')
+/*Log("[json]init -1 ",
+JsonConvert.SerializeObject(this, new JsonSerializerSettings { 
+    ContractResolver = new CloneContractResolver(),
+    
+    Formatting = Formatting.Indented, Error = (_, ev) => ev.ErrorContext.Handled = true }));*/
+            // Is it the value indicator?
+            
+Log("init 0 ", analyzer.Peek(0).ToString() + " " + simpleKey.IsPossible + " " + simpleKey.IsRequired + " " + simpleKeyAllowed + " " + nonePossible);
+Log("init 0.1 ", $"{analyzer.Check(':')} {(flowLevel > 0 || analyzer.IsWhiteBreakOrZero(1))} {!(simpleKeyAllowed && flowLevel > 0)} {(simpleKey.IsPossible || simpleKeyAllowed || nonePossible)}");
+            if (analyzer.Check(':') && (flowLevel > 0 || analyzer.IsWhiteBreakOrZero(1))
+             && !(simpleKeyAllowed && flowLevel > 0))// && (simpleKey.IsPossible || simpleKeyAllowed)) // || nonePossible))
+            // &&
+              //  !(simpleKeyAllowed && flowLevel > 0))
+            {Log("init 1", string.Empty);
                 FetchValue();
                 return;
             }
 
+            /*if(wink == 1)
+            Log("[json]init -1 ",
+JsonConvert.SerializeObject(this, new JsonSerializerSettings { 
+    ContractResolver = new CloneContractResolver(),
+    
+    Formatting = Formatting.Indented, Error = (_, ev) => ev.ErrorContext.Handled = true }));*/
+Log("init 2", string.Empty);
             // Is it an alias?
 
             if (analyzer.Check('*'))
@@ -483,8 +516,10 @@ namespace YamlDotNet.Core
                 !isInvalidPlainScalarCharacter ||
                 (analyzer.Check('-') && !analyzer.IsWhite(1)) ||
                 (flowLevel == 0 && analyzer.Check("?:") && !analyzer.IsWhiteBreakOrZero(1)) ||
-                (simpleKeyAllowed && flowLevel > 0 && analyzer.Check("?:"));
+                (simpleKeyAllowed && flowLevel > 0 && analyzer.Check("?:"))
+           ; //   ||  !(simpleKey.IsPossible || simpleKeyAllowed);
 
+Log("init 2", string.Empty);
             if (isPlainScalar)
             {
                 if (plainScalarFollowedByComment)
@@ -495,6 +530,7 @@ namespace YamlDotNet.Core
 
                 plainScalarFollowedByComment = false;
 
+Log("init 4", string.Empty);
                 FetchPlainScalar();
                 return;
             }
@@ -516,6 +552,42 @@ namespace YamlDotNet.Core
             var end = cursor.Mark();
 
             throw new SyntaxErrorException(start, end, "While scanning for the next token, found character that cannot start any token.");
+        }
+
+public class CloneContractResolver : Newtonsoft.Json.Serialization.DefaultContractResolver
+{
+    protected override IList<JsonProperty> CreateProperties(Type type,
+                                MemberSerialization memberSerialization)
+    {
+        List<MemberInfo> members = GetSerializableMembers(type);
+        if (members == null)
+         throw new JsonSerializationException("Null collection of serializable members returned.");
+
+        members.AddRange(type.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(f => !f.CustomAttributes.Any(x => x.AttributeType
+                == typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute))));
+
+        members.AddRange(type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(f => f.Name != "_charBuffer" && f.Name != "buffer" && !f.CustomAttributes.Any(x => x.AttributeType
+                == typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute))));
+
+        JsonPropertyCollection properties = new JsonPropertyCollection(type);
+        members.ForEach(member =>
+        {
+            JsonProperty property = CreateProperty(member, memberSerialization);
+            property.Writable = true;
+            property.Readable = true;
+            properties.AddProperty(property);
+        });
+        return properties;
+    }
+}
+
+
+        private void Log(string prefix, string message) {
+      
+      if(writer!= null && prefix.StartsWith("[json]")) System.IO.File.WriteAllText("/tmp/boo/json--"+Guid.NewGuid(), message);
+else            if(writer != null) writer.WriteLine("[Scanner] {0} {1}", prefix, message);
         }
 
         private bool CheckWhiteSpace()
@@ -1095,7 +1167,7 @@ namespace YamlDotNet.Core
         /// <summary>
         /// Produce the VALUE token.
         /// </summary>
-
+public TextWriter writer {get;set;}
         private void FetchValue()
         {
             var simpleKey = simpleKeys.Peek();
@@ -2006,7 +2078,7 @@ namespace YamlDotNet.Core
         /// <summary>
         /// Scan a plain scalar.
         /// </summary>
-
+int wink = 0;
         private Scalar ScanPlainScalar(ref bool isMultiline)
         {
             var value = new StringBuilder();
@@ -2173,7 +2245,7 @@ namespace YamlDotNet.Core
             }
 
             // Create a token.
-
+if(writer != null) {writer.WriteLine("first one >>>>>>>.--------- {0}", value.ToString()); if(value.ToString().Contains("multi")) wink=1;}
             return new Scalar(value.ToString(), ScalarStyle.Plain, start, end);
         }
 

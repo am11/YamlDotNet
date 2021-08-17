@@ -29,6 +29,7 @@ namespace YamlDotNet.Core
     /// </summary>
     public interface IScanner
     {
+        System.IO.TextWriter writer {get;set;}
         /// <summary>
         /// Gets the current position inside the input stream.
         /// </summary>
