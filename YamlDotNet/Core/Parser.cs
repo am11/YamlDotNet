@@ -119,6 +119,7 @@ private TextWriter writer;
 
         private ParsingEvent StateMachine()
         {
+                        if (writer != null) writer.WriteLine("state is: " + state);
             switch (state)
             {
                 case ParserState.StreamStart:
@@ -460,6 +461,7 @@ private TextWriter writer;
         /// </summary>
         private ParsingEvent ParseNode(bool isBlock, bool isIndentlessSequence)
         {
+                        if (writer != null) writer.WriteLine("maybe 0");
             if (GetCurrentToken() is Error errorToken)
             {
                 throw new SemanticErrorException(errorToken.Start, errorToken.End, errorToken.Value);
@@ -485,6 +487,7 @@ private TextWriter writer;
             // The anchor and the tag can be in any order. This loop repeats at most twice.
             while (true)
             {
+if (writer != null) writer.WriteLine("<< while ....... true");
                 if (anchorName.IsEmpty && current is Anchor anchor)
                 {
                     lastAnchor = anchor;
@@ -570,7 +573,7 @@ private TextWriter writer;
 
                     // Read next token to ensure the error case spec test 'CXX2':
                     // "Mapping with anchor on document start line".
-if (writer != null) writer.WriteLine("freakin {0} -- {1}", scalar.Value, start);
+if (writer != null) writer.WriteLine("freakin {0} -- {1} -- {2}", scalar.Value, start, scalar.End);
                     if (!anchorName.IsEmpty && scanner.MoveNextWithoutConsuming())
                     {
 if (writer != null) writer.WriteLine("<<1");
@@ -585,6 +588,7 @@ if (writer != null) writer.WriteLine("<<1");
                     // Read next token to ensure the error case spec test 'T833':
                     // "Flow mapping missing a separating comma".
 
+if (writer != null) writer.WriteLine("<<88");
                     if (state == ParserState.FlowMappingKey && scanner.MoveNextWithoutConsuming())
                     {
                         if (writer != null) writer.WriteLine("<<2");
@@ -611,8 +615,10 @@ if (writer != null) writer.WriteLine("<<1");
                     return new Events.MappingStart(anchorName, tagName, isImplicit, MappingStyle.Flow, start, flowMappingStart.End);
                 }
 
+if (writer != null) writer.WriteLine("<<90");
                 if (isBlock)
                 {
+if (writer != null) writer.WriteLine("<<91");
                     if (current is BlockSequenceStart blockSequenceStart)
                     {
                         state = ParserState.BlockSequenceFirstEntry;
@@ -628,11 +634,38 @@ if (writer != null) writer.WriteLine("<<1");
 
                 if (!anchorName.IsEmpty || !tagName.IsEmpty)
                 {
+if (writer != null) writer.WriteLine("<<92");
                     state = states.Pop();
                     return new Events.Scalar(anchorName, tagName, string.Empty, ScalarStyle.Plain, isImplicit, false, start, current.End);
                 }
 
+                /*if(state == ParserState.FlowMappingValue && current is Value)
+                {
+                    if (writer != null) writer.WriteLine(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> {0} -- {1}", current, isIndentlessSequence);
 
+                    state = states.Pop();
+                    Skip();
+                    current = GetCurrentToken();
+                    //if (current is Scalar)
+                   // if (writer != null) writer.WriteLine("|||| {0} -- {1} -- {2} -- {3} |||| start: {4}", state, current, current.Start, current.End, v.Start);
+                  //  state = states.Pop();
+                  
+                    if(current is Scalar flowMappingValueNeedsColon){
+                    if (writer != null)  writer.WriteLine("boo {0} -- {1}", flowMappingValueNeedsColon.Value, flowMappingValueNeedsColon.Start);
+                    if (writer != null)  writer.WriteLine("foo {0}", anchorName);
+                    //if (writer != null)  writer.WriteLine("bar {0} -- {1}", v, current.End);
+                    //state = states.Pop();
+                    Skip();
+                   
+                    return new Events.Scalar(anchorName, tagName, ":" + flowMappingValueNeedsColon.Value, ScalarStyle.Plain, isImplicit, false, start, current.End);
+                    }
+                }*/
+if (writer != null && false) {
+    writer.WriteLine("start exception");
+    while (scanner.MoveNextWithoutConsuming()){
+        writer.WriteLine(scanner.Current);
+    }
+}
 
                 throw new SemanticErrorException(current.Start, current.End, "While parsing a node, did not find expected node content." + current + " " +  state);
             }
@@ -990,12 +1023,14 @@ public bool START = false;
         /// </summary>
         private ParsingEvent ParseFlowMappingKey(bool isFirst)
         {
+                        if (writer != null) writer.WriteLine("nother one 0");
             if (isFirst)
             {
                 GetCurrentToken();
                 Skip();
             }
 
+                        if (writer != null) writer.WriteLine("nother one 1");
             var current = GetCurrentToken();
             if (!(current is FlowMappingEnd))
             {
@@ -1006,12 +1041,21 @@ public bool START = false;
                         Skip();
                         current = GetCurrentToken();
                     }
-                    else
+                    else if (current is Scalar)
                     {
-                        throw new SemanticErrorException(current?.Start ?? Mark.Empty, current?.End ?? Mark.Empty, "While parsing a flow mapping,  did not find expected ',' or '}'.");
+                        if (writer != null) writer.WriteLine("yeaaa i'm flow mapping scalar");
+                      
+                  //  states.Push(ParserState.FlowMappingValue);
+                    //    return ParseFlowMappingValue(isFirst);
+                        if (writer != null) writer.WriteLine("but naw! " + current);
+                    }
+                    else //if (!(current is Scalar))
+                    {
+                        throw new SemanticErrorException(current?.Start ?? Mark.Empty, current?.End ?? Mark.Empty, "While parsing a flow mapping,  did not find expected ',' or '}'." + current);
                     }
                 }
 
+                        if (writer != null) writer.WriteLine("nother one 2");
                 if (current is Key)
                 {
                     Skip();
@@ -1053,15 +1097,19 @@ public bool START = false;
         /// </summary>
         private ParsingEvent ParseFlowMappingValue(bool isEmpty)
         {
+                        if (writer != null) writer.WriteLine("valll 0");
             var current = GetCurrentToken();
             if (isEmpty)
             {
+                        if (writer != null) writer.WriteLine("valll 0.1");
                 state = ParserState.FlowMappingKey;
                 return ProcessEmptyScalar(current?.Start ?? Mark.Empty);
             }
 
+                        if (writer != null) writer.WriteLine("valll 1");
             if (current is Value)
             {
+                        if (writer != null) writer.WriteLine("valll 2");
                 Skip();
                 current = GetCurrentToken();
                 if (!(current is FlowEntry || current is FlowMappingEnd))
@@ -1071,6 +1119,17 @@ public bool START = false;
                 }
             }
 
+           if (current is Scalar scalar) // && state is FlowMappingValue)
+            {//     Skip();
+             if (writer != null) writer.WriteLine("valll WOWWWWWWWWWWWWWWWWWWWWWW " + current + " " + state);
+            //state = states.Pop();
+            state = ParserState.FlowMappingKey;
+            Skip();
+             if (writer != null) writer.WriteLine("valll WOWWWWWWWWWWWWWWWWWWWWWW new state " + current + " " + state);
+                return new Events.Scalar(AnchorName.Empty, TagName.Empty, scalar.Value, scalar.Style, false, false, current.Start, scalar.End);
+            }
+
+                        if (writer != null) writer.WriteLine("valll 3 " + current + " " + state);
             state = ParserState.FlowMappingKey;
             return ProcessEmptyScalar(current?.Start ?? Mark.Empty);
         }

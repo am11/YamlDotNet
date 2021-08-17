@@ -73,6 +73,7 @@ namespace YamlDotNet.Core
         private int flowSequenceStartLine;
         private int indent = -1;
         private bool simpleKeyAllowed;
+        private bool flowScalarFetched;
         private int flowLevel;
         private int tokensParsed;
         private bool tokenAvailable;
@@ -418,12 +419,14 @@ JsonConvert.SerializeObject(this, new JsonSerializerSettings {
             // Is it the value indicator?
             
 Log("init 0 ", analyzer.Peek(0).ToString() + " " + simpleKey.IsPossible + " " + simpleKey.IsRequired + " " + simpleKeyAllowed + " " + nonePossible);
-Log("init 0.1 ", $"{analyzer.Check(':')} {(flowLevel > 0 || analyzer.IsWhiteBreakOrZero(1))} {!(simpleKeyAllowed && flowLevel > 0)} {(simpleKey.IsPossible || simpleKeyAllowed || nonePossible)}");
+Log("init 0.1 ", $"{analyzer.Check(':')} {(flowLevel > 0 || analyzer.IsWhiteBreakOrZero(1))} {!(simpleKeyAllowed && flowLevel > 0)} {(simpleKey.IsPossible || simpleKeyAllowed || !nonePossible)}");
             if (analyzer.Check(':') && (flowLevel > 0 || analyzer.IsWhiteBreakOrZero(1))
-             && !(simpleKeyAllowed && flowLevel > 0))// && (simpleKey.IsPossible || simpleKeyAllowed)) // || nonePossible))
+             && !(simpleKeyAllowed && flowLevel > 0)
+             && (!flowScalarFetched || !analyzer.Check(':', 1)) //(simpleKey.IsPossible || simpleKeyAllowed)) // || nonePossible))
+            )
             // &&
               //  !(simpleKeyAllowed && flowLevel > 0))
-            {Log("init 1", string.Empty);
+            {Log("init 1", cursor.Mark().ToString());
                 FetchValue();
                 return;
             }
@@ -517,6 +520,7 @@ Log("init 2", string.Empty);
                 (analyzer.Check('-') && !analyzer.IsWhite(1)) ||
                 (flowLevel == 0 && analyzer.Check("?:") && !analyzer.IsWhiteBreakOrZero(1)) ||
                 (simpleKeyAllowed && flowLevel > 0 && analyzer.Check("?:"))
+                || (flowScalarFetched && analyzer.Check(':'))
            ; //   ||  !(simpleKey.IsPossible || simpleKeyAllowed);
 
 Log("init 2", string.Empty);
@@ -529,6 +533,15 @@ Log("init 2", string.Empty);
                 }
 
                 plainScalarFollowedByComment = false;
+
+if (flowScalarFetched) {
+    if(analyzer.Check(':')) {
+Log("init skippinggggggggggggggggggg......................................gGggg...........", string.Empty);
+ Skip();
+ }
+
+    flowScalarFetched = false;
+}
 
 Log("init 4", string.Empty);
                 FetchPlainScalar();
@@ -1171,11 +1184,13 @@ public TextWriter writer {get;set;}
         private void FetchValue()
         {
             var simpleKey = simpleKeys.Peek();
-
+ if(writer != null) writer.WriteLine("here here 1");
             // Have we find a simple key?
 
             if (simpleKey.IsPossible)
             {
+                
+ if(writer != null) writer.WriteLine("here here 2");
                 // Create the KEY token and insert it into the queue.
 
                 tokens.Insert(simpleKey.TokenNumber - tokensParsed, new Key(simpleKey.Mark, simpleKey.Mark));
@@ -1194,6 +1209,8 @@ public TextWriter writer {get;set;}
             }
             else
             {
+                
+ if(writer != null) writer.WriteLine("here here 3");
                 // The ':' indicator follows a complex key.
 
                 // Simple keys after ':' are allowed in the block context.
@@ -1204,15 +1221,19 @@ public TextWriter writer {get;set;}
 
                 if (localSimpleKeyAllowed)
                 {
+                    
+ if(writer != null) writer.WriteLine("here here 3.1");
                     // Check if we are allowed to start a complex value.
 
                     if (!simpleKeyAllowed)
                     {
+ if(writer != null) writer.WriteLine("here here 3.2");
                         var mark = cursor.Mark();
                         tokens.Enqueue(new Error("Mapping values are not allowed in this context.", mark, mark));
                         return;
                     }
 
+ if(writer != null) writer.WriteLine("here here 3.3");
                     // Add the BLOCK-MAPPING-START token if needed.
 
                     RollIndent(cursor.LineOffset, -1, false, cursor.Mark());
@@ -1221,6 +1242,8 @@ public TextWriter writer {get;set;}
 
                     if (cursor.LineOffset == 0 && simpleKey.LineOffset == 0)
                     {
+                        
+ if(writer != null) writer.WriteLine("here here 3.4");
                         // Create the KEY token and insert it into the queue.
 
                         tokens.Insert(tokens.Count, new Key(simpleKey.Mark, simpleKey.Mark));
@@ -1231,11 +1254,13 @@ public TextWriter writer {get;set;}
                     }
                 }
 
+ if(writer != null) writer.WriteLine("here here 4");
                 simpleKeyAllowed = localSimpleKeyAllowed;
             }
 
             // Consume the token.
 
+ if(writer != null) writer.WriteLine("here here 5");
             var start = cursor.Mark();
             Skip();
 
@@ -1803,6 +1828,10 @@ public TextWriter writer {get;set;}
 
             simpleKeyAllowed = false;
 
+            // Indicates the adjacent flow scalar that a prior flow scalar has been fetched.
+
+            flowScalarFetched = true;
+
             // Create the SCALAR token and append it to the queue.
 
             tokens.Enqueue(ScanFlowScalar(isSingleQuoted));
@@ -2125,6 +2154,7 @@ int wink = 0;
 
                     if (analyzer.Check(':') && !isAliasValue && (analyzer.IsWhiteBreakOrZero(1) || (flowLevel > 0 && analyzer.Check(',', 1))) || (flowLevel > 0 && analyzer.Check(",?[]{}")))
                     {
+                        if(writer != null) writer.WriteLine("bye first one >>>>>>>.--------- {0}", value.ToString());
                         if (flowLevel == 0 && !key.IsPossible)
                         {
                             tokens.Enqueue(new Error("While scanning a plain scalar value, found invalid mapping.", cursor.Mark(), cursor.Mark()));
