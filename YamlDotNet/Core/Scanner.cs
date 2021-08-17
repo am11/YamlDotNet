@@ -69,6 +69,7 @@ namespace YamlDotNet.Core
         private int flowSequenceStartLine;
         private int indent = -1;
         private bool simpleKeyAllowed;
+        private bool flowScalarFetched;
         private int flowLevel;
         private int tokensParsed;
         private bool tokenAvailable;
@@ -298,10 +299,8 @@ namespace YamlDotNet.Core
 
             UnrollIndent(cursor.LineOffset);
 
-
             // Ensure that the buffer contains at least 4 characters.  4 is the length
             // of the longest indicators ('--- ' and '... ').
-
 
             analyzer.Buffer.Cache(4);
 
@@ -396,7 +395,7 @@ namespace YamlDotNet.Core
             // Is it the value indicator?
 
             if (analyzer.Check(':') && (flowLevel > 0 || analyzer.IsWhiteBreakOrZero(1)) &&
-                !(simpleKeyAllowed && flowLevel > 0))
+                !(simpleKeyAllowed && flowLevel > 0) && !(flowScalarFetched && analyzer.Check(':', 1)))
             {
                 FetchValue();
                 return;
@@ -483,7 +482,7 @@ namespace YamlDotNet.Core
                 !isInvalidPlainScalarCharacter ||
                 (analyzer.Check('-') && !analyzer.IsWhite(1)) ||
                 (flowLevel == 0 && analyzer.Check("?:") && !analyzer.IsWhiteBreakOrZero(1)) ||
-                (simpleKeyAllowed && flowLevel > 0 && analyzer.Check("?:"));
+                (simpleKeyAllowed && flowLevel > 0) || flowScalarFetched;
 
             if (isPlainScalar)
             {
@@ -491,6 +490,11 @@ namespace YamlDotNet.Core
                 {
                     var startMark = cursor.Mark();
                     tokens.Enqueue(new Error("While scanning plain scalar, found a comment between adjacent scalars.", startMark, startMark));
+                }
+                if (flowScalarFetched)
+                {
+                    if (analyzer.Check(':')) Skip();
+                    flowScalarFetched = false;
                 }
 
                 plainScalarFollowedByComment = false;
@@ -1730,6 +1734,10 @@ namespace YamlDotNet.Core
             // A simple key cannot follow a flow scalar.
 
             simpleKeyAllowed = false;
+
+            // Indicates the adjacent flow scalar that a prior flow scalar has been fetched.
+
+            flowScalarFetched = true;
 
             // Create the SCALAR token and append it to the queue.
 

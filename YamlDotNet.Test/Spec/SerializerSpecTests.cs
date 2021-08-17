@@ -50,7 +50,7 @@ namespace YamlDotNet.Test.Spec
             "NB6Z", "NHX8", "NJ66", "NP9H", "P2AD", "P76L", "PRH3", "PUW8", "PW8X", "Q88A", "Q8AD", "QT73", "R4YG", "R52L", "RTP8",
             "RZP5", "RZT7", "S3PD", "S4JQ", "S4T7", "S7BG", "SKE5", "SSW6", "T4YY", "T5N4", "U3C3", "U3XV", "U9NS", "UGM3", "UT92",
             "V55R", "W42U", "W4TN", "W5VH", "WZ62", "X38W", "X8DW", "XLQ9", "XV9V", "XW4D", "Y2GN", "Z67P", "Z9M4", "ZH7C", "ZWK4",
-            "5T43", "NKF9", "CFD4", "JR7V"
+            "NKF9", "CFD4", "JR7V"
         };
 
         private static readonly List<string> knownFalsePositives = new List<string>
