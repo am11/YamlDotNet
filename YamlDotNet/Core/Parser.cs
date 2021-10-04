@@ -928,7 +928,7 @@ public bool START = false;
                     }
                     else
                     {
-                        throw new SemanticErrorException(current?.Start ?? Mark.Empty, current?.End ?? Mark.Empty, "While parsing a flow sequence, did not find expected ',' or ']'.");
+                        throw new SemanticErrorException(current?.Start ?? Mark.Empty, current?.End ?? Mark.Empty, "While parsing a flow sequence, did not find expected ',' or ']'." + current +" " + state);
                     }
                 }
 

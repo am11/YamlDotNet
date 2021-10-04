@@ -39,7 +39,7 @@ namespace YamlDotNet.Test.Spec
 
         private static readonly List<string> ignoredSuites = new List<string>
         {
-            "JR7V", "NKF9", "CFD4", "U99R"
+            "JR7Vx", "NKF9x", "CFD4x", "U99Rx"
         };
 
         private static readonly List<string> knownFalsePositives = new List<string>
@@ -57,10 +57,10 @@ namespace YamlDotNet.Test.Spec
         {
             var debugging = false;
 //            if(don && name != "NJ66") return;
-          if(debugging && name != "5T43") return;
-         //    if(name != "5T43") return;
+      //    if(debugging && name != "5T43") return;
+             if(name != "WZ62") return;
            //if(debugging && name != "5MUD") return;
-          // if(debugging && name != "JR7V") return;
+         //  if(debugging && name != "JR7V") return;
             var expectedResult = File.ReadAllText(expectedEventFile);
             using var writer = new StringWriter();
             using var writer2 = new StringWriter();
@@ -68,7 +68,7 @@ namespace YamlDotNet.Test.Spec
             {
                 using var reader = File.OpenText(inputFile);
                 new LibYamlEventStream(new Parser(reader, debugging ? writer : writer2) {START=true}).WriteTo(writer);
-               if(debugging) 
+               //if(debugging) 
                throw new Exception();
             }
             catch (Exception ex)

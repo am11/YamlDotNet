@@ -74,6 +74,8 @@ namespace YamlDotNet.Core
         private int indent = -1;
         private bool simpleKeyAllowed;
         private bool flowScalarFetched;
+        private bool blockSequenceStarted;
+        private bool flowSequenceStarted;
         private int flowLevel;
         private int tokensParsed;
         private bool tokenAvailable;
@@ -458,6 +460,7 @@ Log("init 2", string.Empty);
 
             if (analyzer.Check('!'))
             {
+                Log("yes tag", null);
                 FetchTag();
                 return;
             }
@@ -753,6 +756,7 @@ else            if(writer != null) writer.WriteLine("[Scanner] {0} {1}", prefix,
 
                 var mark = cursor.Mark();
                 tokens.Enqueue(new BlockEnd(mark, mark));
+                blockSequenceStarted = true;
 
                 // Pop the indentation level.
 
@@ -961,6 +965,7 @@ else            if(writer != null) writer.WriteLine("[Scanner] {0} {1}", prefix,
             {
                 token = new FlowSequenceStart(start, start);
                 flowSequenceStartLine = token.Start.Line;
+                flowSequenceStarted = true;
             }
             else
             {
@@ -1105,7 +1110,7 @@ else            if(writer != null) writer.WriteLine("[Scanner] {0} {1}", prefix,
                     var mark = cursor.Mark();
                     tokens.Enqueue(new Error("Block sequence entries are not allowed in this context.", mark, mark));
                 }
-
+blockSequenceStarted = true;
                 // Add the BLOCK-SEQUENCE-START token if needed.
                 RollIndent(cursor.LineOffset, -1, true, cursor.Mark());
             }
@@ -1428,12 +1433,15 @@ public TextWriter writer {get;set;}
             var start = cursor.Mark();
 
             // Check if the tag is in the canonical form.
+writer?.WriteLine(">>>>>>>> =================00000000000000 ============ yo -1");
 
             string handle;
             string suffix;
 
             if (analyzer.Check('<', 1))
             {
+                writer?.WriteLine(">>>>>>>> =================00000000000000 ============ yo 0");
+
                 // Set the handle to ''
 
                 handle = string.Empty;
@@ -1465,10 +1473,11 @@ public TextWriter writer {get;set;}
                 var firstPart = ScanTagHandle(false, start);
 
                 // Check if it is, indeed, handle.
-
+writer?.WriteLine(">>>>>>>> =================00000000000000 ============ yo 1");
                 if (firstPart.Length > 1 && firstPart[0] == '!' && firstPart[firstPart.Length - 1] == '!')
                 {
                     handle = firstPart;
+writer?.WriteLine(">>>>>>>> =================00000000000000 ============ yo 2");
 
                     // Scan the suffix now.
 
@@ -1477,6 +1486,7 @@ public TextWriter writer {get;set;}
                 else
                 {
                     // It wasn't a handle after all.  Scan the rest of the tag.
+writer?.WriteLine(">>>>>>>> =================00000000000000 ============ yo 3");
 
                     suffix = ScanTagUri(firstPart, start);
 
@@ -1491,11 +1501,14 @@ public TextWriter writer {get;set;}
 
                     if (suffix.Length == 0)
                     {
+                        writer?.WriteLine(">>>>>>>> =================00000000000000 ============ yo 4");
+
                         suffix = handle;
                         handle = string.Empty;
                     }
                 }
             }
+writer?.WriteLine(">>>>>>>> =================00000000000000 ============ yo 5");
 
             // Check the character which ends the tag.
 
@@ -1503,6 +1516,7 @@ public TextWriter writer {get;set;}
             {
                 throw new SyntaxErrorException(start, cursor.Mark(), "While scanning a tag, did not find expected whitespace, comma or line break.");
             }
+writer?.WriteLine(">>>>>>>> =================00000000000000 ============ yo 7");
 
             // Create a token.
 
@@ -2152,7 +2166,7 @@ int wink = 0;
                 {
                     // Check for indicators that may end a plain scalar.
 
-                    if (analyzer.Check(':') && !isAliasValue && (analyzer.IsWhiteBreakOrZero(1) || (flowLevel > 0 && analyzer.Check(',', 1))) || (flowLevel > 0 && analyzer.Check(",?[]{}")))
+                    if (analyzer.Check(':') && !isAliasValue && (analyzer.IsWhiteBreakOrZero(1) || (flowLevel > 0 && analyzer.Check(',', 1))) || (flowLevel > 0 && analyzer.Check(",[]{}")))
                     {
                         if(writer != null) writer.WriteLine("bye first one >>>>>>>.--------- {0}", value.ToString());
                         if (flowLevel == 0 && !key.IsPossible)
@@ -2311,6 +2325,7 @@ if(writer != null) {writer.WriteLine("first one >>>>>>>.--------- {0}", value.To
         /// </summary>
         private string ScanDirectiveName(Mark start)
         {
+            if(writer != null) writer.WriteLine("ooooooooooooooooooooh");
             var name = new StringBuilder();
 
             // Consume the directive name.
@@ -2436,12 +2451,13 @@ if(writer != null) {writer.WriteLine("first one >>>>>>>.--------- {0}", value.To
             //      '=', '+', '$', ',', '.', '!', '~', '*', '\'', '(', ')', '[', ']',
             //      '%'.
 
-
             while (analyzer.IsAlphaNumericDashOrUnderscore() || analyzer.Check(";/?:@&=+$.!~*'()[]%") ||
-                   (analyzer.Check(',') && !analyzer.IsBreak(1)))
+                   (analyzer.Check(',') && !analyzer.IsWhiteBreakOrZero(1)))
             {
+                Log("touri 3", analyzer.Peek(0) + "  " + tag.ToString());
                 // Check if it is a URI-escape sequence.
-
+//if(analyzer.Check(','))
+//throw new Exception("fooooo");
                 if (analyzer.Check('%'))
                 {
                     tag.Append(ScanUriEscapes(start));
@@ -2457,6 +2473,9 @@ if(writer != null) {writer.WriteLine("first one >>>>>>>.--------- {0}", value.To
                 }
             }
 
+if(analyzer.Check(',') && blockSequenceStarted) throw new Exception("noooo");
+
+                Log("touri 4", tag.ToString() + " ... " +  analyzer.Peek(0) + "  " + analyzer.Check(',').ToString() + " " + (!analyzer.IsBreak(1)).ToString());
             // Check if the tag is non-empty.
 
             if (tag.Length == 0)
@@ -2545,7 +2564,7 @@ if(writer != null) {writer.WriteLine("first one >>>>>>>.--------- {0}", value.To
 
         private string ScanTagHandle(bool isDirective, Mark start)
         {
-
+Log("handle 1", null);
             // Check the initial '!' character.
 
             if (!analyzer.Check('!'))
@@ -2562,6 +2581,7 @@ if(writer != null) {writer.WriteLine("first one >>>>>>>.--------- {0}", value.To
 
             while (analyzer.IsAlphaNumericDashOrUnderscore())
             {
+Log("handle 2", tagHandle.ToString());
                 tagHandle.Append(ReadCurrentCharacter());
             }
 
@@ -2569,6 +2589,8 @@ if(writer != null) {writer.WriteLine("first one >>>>>>>.--------- {0}", value.To
 
             if (analyzer.Check('!'))
             {
+Log("handle 3", tagHandle.ToString());
+
                 tagHandle.Append(ReadCurrentCharacter());
             }
             else
@@ -2577,6 +2599,7 @@ if(writer != null) {writer.WriteLine("first one >>>>>>>.--------- {0}", value.To
                 // It's either the '!' tag or not really a tag handle.  If it's a %TAG
                 // directive, it's an error.  If it's a tag token, it must be a part of
                 // URI.
+Log("handle 4", tagHandle.ToString());
 
 
                 if (isDirective && (tagHandle.Length != 1 || tagHandle[0] != '!'))
@@ -2584,6 +2607,7 @@ if(writer != null) {writer.WriteLine("first one >>>>>>>.--------- {0}", value.To
                     throw new SyntaxErrorException(start, cursor.Mark(), "While scanning a tag directive, did not find expected '!'.");
                 }
             }
+Log("handle 5", tagHandle.ToString());
 
             return tagHandle.ToString();
         }
